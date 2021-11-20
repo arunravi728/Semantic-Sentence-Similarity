@@ -62,26 +62,26 @@ def generateTrainingData(tokens):
     train_data = []
     for i, token in enumerate(tokens):
         X = generateOneHotEncoding(token)
-        Y = []
         if(i < WINDOW_SIZE):
-            for j in range(0,2*WINDOW_SIZE + 1):
+            for j in range(0,i):
+                train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
+            for j in range(i+1, i + WINDOW_SIZE + 1):
                 if(j != i):
-                    Y.append(generateOneHotEncoding(tokens[j]))
+                    train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
         elif(i + WINDOW_SIZE > len(tokens) - 1):
-            for j in range(len(tokens) - 2*WINDOW_SIZE - 1,len(tokens)):
+            for j in range(i - WINDOW_SIZE,i):
                 if(j != i):
-                    Y.append(generateOneHotEncoding(tokens[j]))
+                    train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
+            for j in range(i+1, len(tokens)):
+                train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
         else:
             for j in range(int(i - WINDOW_SIZE), int(i + WINDOW_SIZE + 1)):
                 if(j != i):
-                    Y.append(generateOneHotEncoding(tokens[j]))
-
-        train_data.append(tuple([X,Y]))
+                    train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
     return train_data
 
 text = getText("data.txt")
 tokens = generateTokens(text)
 VOCABULARY, VOCABULARY_SIZE = generateVocabulary(tokens)
 train_data = generateTrainingData(tokens)
-print(len(train_data[0][1]))
-
+print(len(train_data))
