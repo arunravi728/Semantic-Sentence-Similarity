@@ -6,11 +6,13 @@ import matplotlib.pyplot as plt
 
 import torch
 
-CONTEXT_SIZE = 4
-WINDOW_SIZE = 5           # WINDOW_SIZE number of words on either side of the input word
+WINDOW_SIZE = 5             # WINDOW_SIZE number of words on either side of the input word
 VOCABULARY_SIZE = 0
+CORPUS_SIZE = 0
 
 VOCABULARY = {}
+UNIGRAM_RATIOS = []
+BERNOULLI_MAP = []          # Bernoulli Map to help with subsampling
 
 """
 Function to get string from a file
@@ -23,17 +25,17 @@ def getText(fileName):
 
 """
 Function to tokenize strings
-Input: text
-Output: Tokenized version of string
+Input: Text
+Output: Tokenized version of string, Corpus Size
 """
 def generateTokens(text):
     pattern = re.compile(r'[A-Za-z]+[\w^\']*|[\w^\']*[A-Za-z]+[\w^\']*')
-    return pattern.findall(text.lower())
+    return pattern.findall(text.lower()), len(pattern.findall(text.lower()))
 
 """
 Function to generate Vocabulary
 Input: Tokens
-Output: vocabulary, size of vocabulary
+Output: Vocabulary, Vocabulary Size
 """
 def generateVocabulary(tokens):
     vocabulary = {}
@@ -44,9 +46,37 @@ def generateVocabulary(tokens):
     return vocabulary, len(vocabulary)
 
 """
+Function to generate Unigram Ratios
+Input: Tokens
+Output: Unigram Ratios
+"""
+def generateUnigramRatios(tokens):
+    unigram_ratios = torch.zeros(VOCABULARY_SIZE)
+    
+    for token in tokens:
+        unigram_ratios[VOCABULARY[token]] += 1
+    
+    return unigram_ratios/CORPUS_SIZE
+
+"""
+Function to generate Bernoulli Map to help with sub-sampling
+Input: Tokens
+Output: Bernoulli Map
+"""
+def generateBernoulliMap(tokens):
+    bernoulli_map = torch.ones(CORPUS_SIZE)
+
+    for i in range(len(tokens)):
+        ratio = UNIGRAM_RATIOS[VOCABULARY[tokens[i]]]
+        p_keep = (np.sqrt(ratio * 1000) + 1) * (0.001/ratio)
+        bernoulli_map[i] = np.random.choice(np.array([0,1]), p = [round(1 - p_keep.item(),3), round(p_keep.item(),3)])
+    
+    return bernoulli_map
+
+"""
 Function to generate One Hot Encoded Vector of a word
-Input: word, vocabulary, size of vocabulary
-Output: List of One Hot Encoded Vector
+Input: word
+Output: One Hot Encoded Vector
 """
 def generateOneHotEncoding(word):
     one_hot_encoded_vector = torch.zeros(VOCABULARY_SIZE)
@@ -54,9 +84,9 @@ def generateOneHotEncoding(word):
     return one_hot_encoded_vector
 
 """
-Function to generate Training Data
+Function to generate Training Data with Subsampling
 Input: text
-Output: Training Data -> List of One Hot Encoded Tuples
+Output: Sub-Sampled Training Data
 """
 def generateTrainingData(tokens):
     train_data = []
@@ -64,24 +94,30 @@ def generateTrainingData(tokens):
         X = generateOneHotEncoding(token)
         if(i < WINDOW_SIZE):
             for j in range(0,i):
-                train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
+                if(BERNOULLI_MAP[j] == 1):
+                    train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
             for j in range(i+1, i + WINDOW_SIZE + 1):
                 if(j != i):
-                    train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
+                    if(BERNOULLI_MAP[j] == 1):
+                        train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
         elif(i + WINDOW_SIZE > len(tokens) - 1):
             for j in range(i - WINDOW_SIZE,i):
                 if(j != i):
-                    train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
+                    if(BERNOULLI_MAP[j] == 1):
+                        train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
             for j in range(i+1, len(tokens)):
-                train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
+                if(BERNOULLI_MAP[j] == 1):
+                    train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
         else:
             for j in range(int(i - WINDOW_SIZE), int(i + WINDOW_SIZE + 1)):
                 if(j != i):
-                    train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
+                    if(BERNOULLI_MAP[j] == 1):
+                        train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
     return train_data
 
 text = getText("data.txt")
-tokens = generateTokens(text)
+tokens, CORPUS_SIZE = generateTokens(text)
 VOCABULARY, VOCABULARY_SIZE = generateVocabulary(tokens)
+UNIGRAM_RATIOS = generateUnigramRatios(tokens)
+BERNOULLI_MAP = generateBernoulliMap(tokens)
 train_data = generateTrainingData(tokens)
-print(len(train_data))
