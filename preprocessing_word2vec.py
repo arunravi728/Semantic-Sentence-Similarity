@@ -94,27 +94,30 @@ def generateTrainingData(tokens):
         if(BERNOULLI_MAP[i] == 0):
             continue
         X = generateOneHotEncoding(token)
+        Y = []
         if(i < WINDOW_SIZE):
             for j in range(0,i):
                 if(BERNOULLI_MAP[j] == 1):
-                    train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
+                    Y.append(generateOneHotEncoding(tokens[j]))
             for j in range(i+1, i + WINDOW_SIZE + 1):
                 if(j != i):
                     if(BERNOULLI_MAP[j] == 1):
-                        train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
+                        Y.append(generateOneHotEncoding(tokens[j]))
         elif(i + WINDOW_SIZE > len(tokens) - 1):
             for j in range(i - WINDOW_SIZE,i):
                 if(j != i):
                     if(BERNOULLI_MAP[j] == 1):
-                        train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
+                        Y.append(generateOneHotEncoding(tokens[j]))
             for j in range(i+1, len(tokens)):
                 if(BERNOULLI_MAP[j] == 1):
-                    train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
+                    Y.append(generateOneHotEncoding(tokens[j]))
         else:
             for j in range(int(i - WINDOW_SIZE), int(i + WINDOW_SIZE + 1)):
                 if(j != i):
                     if(BERNOULLI_MAP[j] == 1):
-                        train_data.append(tuple([X,generateOneHotEncoding(tokens[j])]))
+                        Y.append(generateOneHotEncoding(tokens[j]))
+        
+    train_data.append(tuple((X,Y)))
     return train_data
 
 text = getText("data.txt")
