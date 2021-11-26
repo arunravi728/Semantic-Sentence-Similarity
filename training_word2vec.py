@@ -3,24 +3,22 @@ import numpy as np
 import pandas as pd
 import math
 import random
-import tqdm
+from tqdm import tqdm
 
-from preprocessing_word2vec import VOCABULARY, generateOneHotEncoding
+from preprocessing_word2vec import VOCABULARY, VOCABULARY_SIZE, tokens, train_data, UNIGRAM_RATIOS, generateOneHotEncoding
 
 #hidden dimensionality of the word embeddings
 N = 300
 
-#Vocabulary Size
-V = len(VOCABULARY)
 
 #Context Size
 C = 5
 
 #Read Vocabulary Here
-VOCABULARY = {}
+#VOCABULARY = {}
 
 #Entire Corpus Stored Here
-TOKENS = []
+TOKENS = tokens
 
 #Learning Rate for SGD
 alpha = 0.001
@@ -38,7 +36,7 @@ Output : Noise distribution for Negative Sampling
 """
 def generateNoiseDist():
     #Read this variable from a txt file here
-    unigram_counts = []
+    unigram_counts = [ele*len(TOKENS) for ele in UNIGRAM_RATIOS]
 
     unigram_counts = [ele ** 0.75 for ele in unigram_counts]
     sum_counts = sum(unigram_counts)
@@ -57,8 +55,8 @@ class SkipGram():
     Constructor initializes input and output weight matrices
     """
     def __init__(self):
-        self.W_in = (-2/math.sqrt(N))*torch.rand(V,N) + 1/math.sqrt(N)
-        self.W_out = (-2/math.sqrt(N))*torch.rand(N,V) + 1/math.sqrt(N)
+        self.W_in = (-2/math.sqrt(N))*torch.rand(VOCABULARY_SIZE,N) + 1/math.sqrt(N)
+        self.W_out = (-2/math.sqrt(N))*torch.rand(N,VOCABULARY_SIZE) + 1/math.sqrt(N)
 
     """
     Function to perform a forward pass through the Skip Gram
@@ -67,31 +65,22 @@ class SkipGram():
     """
     def forward(self, input_vector):
         self.input_vector = input_vector
-        self.h = torch.matmul(torch.transpose(self.W_in), self.input_vector)
-        self.out = torch.matmul(torch.transpose(self.W_out), self.h)
+        self.h = torch.matmul(torch.transpose(self.W_in, 0, 1), self.input_vector)
+        self.out = torch.matmul(torch.transpose(self.W_out, 0 ,1), self.h)
         return self.out
 
     """
     Function to compute gradients wrt input & output vectors and the hidden layer output
-    Input : Noise Distribution to sample negative examples from, 
+    Input : Noise Distribution, input string, one hot encoded input, context string
     Output : All the gradients
     """
     def gradients(self, noise_distribution, input, input_encoded, context):
 
-        #summing up & updating gradients for input vector over entire context
-
-        '''if idx == 0:
-            self.inp_grad = torch.zeros(N,1)
-        
-        elif VOCABULARY[prev_input] == VOCABULARY[input]:
-            self.W_in[VOCABULARY[prev_input]] -= alpha * self.inp_grad
-            self.inp_grad = torch.zeros(N,1)'''
-
-        self.inp_grad = torch.zeros(N,1)
+        self.inp_grad = torch.zeros(N)
         
         for id in range(len(context)):
 
-            ##performing the forward pass through the Skip Gram Network
+            #performing the forward pass through the Skip Gram Network
 
             self.forward(input_encoded)
 
@@ -113,8 +102,9 @@ class SkipGram():
             for i in range(K):
                 self.inp_grad += torch.sigmoid(torch.dot(self.W_out[:,VOCABULARY[D_dash[i]]], self.h))* self.W_out[:,VOCABULARY[D_dash[i]]]
             
-            self.inp_grad += (torch.sigmoid(torch.dot(self.W_out[:,VOCABULARY[context]], self.h)) - 1)*self.W_out[:,VOCABULARY[context]]
-        
+            self.inp_grad += (torch.sigmoid(torch.dot(self.W_out[:,VOCABULARY[context[id]]], self.h)) - 1)*self.W_out[:,VOCABULARY[context[id]]] 
+
+        #updating the input vector after all contexts are done
         self.W_in[VOCABULARY[input]] -= alpha * self.inp_grad
 
 
@@ -122,9 +112,8 @@ class SkipGram():
 
 """
 (input_word, list containing all context words in the window)
-Read this variable from a txt file
 """
-training_data = []
+training_data = train_data
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -132,6 +121,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 noise_distribution = generateNoiseDist()
 
 skip_gram = SkipGram()
+
 
 for epoch in tqdm(range(num_epochs)):
     for idx, (input, context) in enumerate(training_data):
@@ -143,3 +133,9 @@ for epoch in tqdm(range(num_epochs)):
         #skip_gram.forward(input_encoded)
 
         skip_gram.gradients(noise_distribution, input, input_encoded, context)
+
+print(list(VOCABULARY.keys())[0])
+
+print(skip_gram.W_in[0])
+
+print(skip_gram.W_in[0].shape)
