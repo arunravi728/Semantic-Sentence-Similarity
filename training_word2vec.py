@@ -4,21 +4,13 @@ import pandas as pd
 import math
 import random
 from tqdm import tqdm
-
-from preprocessing_word2vec import VOCABULARY, VOCABULARY_SIZE, tokens, train_data, UNIGRAM_RATIOS, generateOneHotEncoding
+import pickle
 
 #hidden dimensionality of the word embeddings
 N = 300
 
-
 #Context Size
 C = 5
-
-#Read Vocabulary Here
-#VOCABULARY = {}
-
-#Entire Corpus Stored Here
-TOKENS = tokens
 
 #Learning Rate for SGD
 alpha = 0.001
@@ -30,13 +22,54 @@ K = 5
 num_epochs = 3
 
 """
+Importing Vocabulary from pre-processing.py
+"""
+
+vocabulary_file = open("Pickle/vocabulary_file.pkl",'rb')
+VOCABULARY = pickle.load(vocabulary_file)
+vocabulary_file.close()
+
+VOCABULARY_SIZE = len(VOCABULARY)
+
+"""
+Importing Tokenized Corpus from pre-processing.py
+"""
+
+token_vocabulary_file = open("Pickle/token_vocabulary_file.pkl",'rb')
+tokens_vocab = pickle.load(token_vocabulary_file)
+token_vocabulary_file.close()
+
+"""
+Importing Training Data from pre-processing.py
+"""
+train_data_file = open("Pickle/train_data_file.pkl",'rb')
+train_data = pickle.load(train_data_file)
+train_data_file.close()
+
+"""
+Importing Unigram Ratios from pre-processing.py
+"""
+unigram_file = open("Pickle/unigram_ratios_file.pkl",'rb')
+UNIGRAM_RATIOS = pickle.load(unigram_file)
+unigram_file.close()
+
+"""
+Function to generate One Hot Encoding
+"""
+
+def generateOneHotEncoding(word):
+    one_hot_encoded_vector = torch.zeros(VOCABULARY_SIZE)
+    one_hot_encoded_vector[VOCABULARY[word]] = 1
+    return one_hot_encoded_vector
+
+"""
 Function to generate Noise Distribution (Needs to be executed exactly once!)
 Input : Corpus Vocabulary
 Output : Noise distribution for Negative Sampling
 """
 def generateNoiseDist():
     #Read this variable from a txt file here
-    unigram_counts = [ele*len(TOKENS) for ele in UNIGRAM_RATIOS]
+    unigram_counts = [ele*len(tokens_vocab) for ele in UNIGRAM_RATIOS]
 
     unigram_counts = [ele ** 0.75 for ele in unigram_counts]
     sum_counts = sum(unigram_counts)
@@ -55,8 +88,8 @@ class SkipGram():
     Constructor initializes input and output weight matrices
     """
     def __init__(self):
-        self.W_in = (-2/math.sqrt(N))*torch.rand(VOCABULARY_SIZE,N) + 1/math.sqrt(N)
-        self.W_out = (-2/math.sqrt(N))*torch.rand(N,VOCABULARY_SIZE) + 1/math.sqrt(N)
+        self.W_in = ((-2/math.sqrt(N))*torch.rand(VOCABULARY_SIZE,N) + 1/math.sqrt(N)).to(device)
+        self.W_out = ((-2/math.sqrt(N))*torch.rand(N,VOCABULARY_SIZE) + 1/math.sqrt(N)).to(device)
 
     """
     Function to perform a forward pass through the Skip Gram
@@ -111,20 +144,24 @@ class SkipGram():
 
 
 """
+Format of each training instance
 (input_word, list containing all context words in the window)
 """
-training_data = train_data
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 #Generates the special unigram frequencies from which to negative sample from
-noise_distribution = generateNoiseDist()
+noise_distribution = torch.Tensor(generateNoiseDist()).to(device)
 
-skip_gram = SkipGram()
+skip_gram = SkipGram().to(device)
 
 
 for epoch in tqdm(range(num_epochs)):
-    for idx, (input, context) in enumerate(training_data):
+    for idx, (input, context) in enumerate(train_data):
+
+        input = input.to(device)
+
+        context = context.to(device)
 
         input_encoded = generateOneHotEncoding(input).to(device)
         
@@ -134,8 +171,6 @@ for epoch in tqdm(range(num_epochs)):
 
         skip_gram.gradients(noise_distribution, input, input_encoded, context)
 
-print(list(VOCABULARY.keys())[0])
-
-print(skip_gram.W_in[0])
-
-print(skip_gram.W_in[0].shape)
+word_embeddings_file = open("Pickle/word_embeddings.pkl",'wb')
+pickle.dump(skip_gram.W_in, word_embeddings_file)
+word_embeddings_file.close()
