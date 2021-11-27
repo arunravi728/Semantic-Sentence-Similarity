@@ -17,7 +17,6 @@ BERNOULLI_MAP = []          # Bernoulli Map to help with subsampling
 #hidden dimensionality of the word embeddings
 N = 50
 
-
 #Context Size
 C = 5
 
@@ -70,6 +69,47 @@ Importing Unigram Ratios from pre-processing.py
 unigram_file = open("Pickle/unigram_ratios_file.pkl",'rb')
 UNIGRAM_RATIOS = pickle.load(unigram_file)
 unigram_file.close()
+
+"""
+Importing Vocabulary from pre-processing.py
+"""
+
+vocabulary_file = open("Pickle/vocabulary_file.pkl",'rb')
+VOCABULARY = pickle.load(vocabulary_file)
+vocabulary_file.close()
+
+VOCABULARY_SIZE = len(VOCABULARY)
+
+"""
+Importing Tokenized Corpus from pre-processing.py
+"""
+
+token_vocabulary_file = open("Pickle/token_vocabulary_file.pkl",'rb')
+tokens_vocab = pickle.load(token_vocabulary_file)
+token_vocabulary_file.close()
+
+"""
+Importing Training Data from pre-processing.py
+"""
+train_data_file = open("Pickle/train_data_file.pkl",'rb')
+train_data = pickle.load(train_data_file)
+train_data_file.close()
+
+"""
+Importing Unigram Ratios from pre-processing.py
+"""
+unigram_file = open("Pickle/unigram_ratios_file.pkl",'rb')
+UNIGRAM_RATIOS = pickle.load(unigram_file)
+unigram_file.close()
+
+"""
+Function to generate One Hot Encoding
+"""
+
+def generateOneHotEncoding(word):
+    one_hot_encoded_vector = torch.zeros(VOCABULARY_SIZE)
+    one_hot_encoded_vector[VOCABULARY[word]] = 1
+    return one_hot_encoded_vector
 
 """
 Function to generate Noise Distribution (Needs to be executed exactly once!)
@@ -158,9 +198,9 @@ Format of each training instance
 """
 
 #Generates the special unigram frequencies from which to negative sample from
-noise_distribution = generateNoiseDist()
+noise_distribution = torch.Tensor(generateNoiseDist()).to(device)
 
-skip_gram = SkipGram()
+skip_gram = SkipGram().to(device)
 
 
 
