@@ -4,6 +4,8 @@ import pickle
 import copy
 import tqdm
 
+from loguru import logger
+
 import numpy as np
 from numpy.core.numeric import NaN
 import pandas as pd
@@ -151,8 +153,6 @@ for sentence in tqdm.tqdm(sentences):
         tokens_vocab.append(token)
         CORPUS_SIZE += 1
 
-print(len(tokens_vocab))
-
 token_vocabulary_file = open("Pickle/token_vocabulary_file.pkl",'wb')
 pickle.dump(tokens_vocab,token_vocabulary_file)
 token_vocabulary_file.close()
@@ -181,9 +181,6 @@ vocabulary_file.close()
 CORPUS_SIZE = len(tokens_vocab)
 VOCABULARY_SIZE = len(VOCABULARY)
 
-print(VOCABULARY_SIZE)
-print(CORPUS_SIZE)
-
 UNIGRAM_RATIOS = generateUnigramRatios(tokens_vocab)
 unigram_ratios_file = open("Pickle/unigram_ratios_file.pkl",'wb')
 pickle.dump(UNIGRAM_RATIOS,unigram_ratios_file)
@@ -192,7 +189,6 @@ unigram_ratios_file.close()
 unigram_file = open("Pickle/unigram_ratios_file.pkl",'rb')
 UNIGRAM_RATIOS = pickle.load(unigram_file)
 unigram_file.close()
-print(len(UNIGRAM_RATIOS))
 
 BERNOULLI_MAP = generateBernoulliMap(tokens_train)
 bernoulli_map_file = open("Pickle/bernoulli_map_file.pkl",'wb')
@@ -211,5 +207,3 @@ train_data_file.close()
 train_data_file = open("Pickle/train_data_file.pkl",'rb')
 train_data = pickle.load(train_data_file)
 train_data_file.close()
-
-print(len(train_data))
