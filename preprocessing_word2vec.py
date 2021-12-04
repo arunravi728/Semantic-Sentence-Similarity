@@ -143,12 +143,15 @@ data_file.close()
 
 tokens_vocab = []
 tokens_train = []
+
 for sentence in tqdm.tqdm(sentences):
-    token = generateTokens(sentence)
-    tokens_train.append(token)
-    for t in token:
-        tokens_vocab.append(t)
+    tokens = generateTokens(sentence)
+    tokens_train.append(tokens)
+    for token in tokens:
+        tokens_vocab.append(token)
         CORPUS_SIZE += 1
+
+print(len(tokens_vocab))
 
 token_vocabulary_file = open("Pickle/token_vocabulary_file.pkl",'wb')
 pickle.dump(tokens_vocab,token_vocabulary_file)
@@ -161,8 +164,6 @@ token_train_file.close()
 token_vocabulary_file = open("Pickle/token_vocabulary_file.pkl",'rb')
 tokens_vocab = pickle.load(token_vocabulary_file)
 token_vocabulary_file.close()
-
-print(len(tokens_vocab))
 
 token_train_file = open("Pickle/token_train_file.pkl",'rb')
 tokens_train = pickle.load(token_train_file)
