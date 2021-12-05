@@ -3,6 +3,9 @@ import math
 import pickle
 import tqdm
 
+import warnings
+warnings.filterwarnings("ignore")
+
 from loguru import logger
 
 import numpy as np
@@ -13,9 +16,9 @@ from nltk.corpus import wordnet
 from nltk.corpus import stopwords
 
 import torch
+from transformers import MarianMTModel, MarianTokenizer
 
 NUM_SAMPLES = 0
-DELETE_THRESHOLD = 0.4
 
 SENTENCES_1 = []
 SENTENCES_2 = []
@@ -143,6 +146,30 @@ def insertRandomStopWord(sentence):
     new_sentence += "."
     return new_sentence
 
+"""
+Function to generate back translated sentence
+Input: Sentence
+Output: Back translated sentence
+"""
+def generateBackTranslatedSentence(sentence):
+    source_tokenizer = MarianTokenizer.from_pretrained('Helsinki-NLP/opus-mt-ROMANCE-en')
+    source_model = MarianMTModel.from_pretrained('Helsinki-NLP/opus-mt-ROMANCE-en')
+
+    target_tokenizer = MarianTokenizer.from_pretrained('Helsinki-NLP/opus-mt-en-fr')
+    target_model = MarianMTModel.from_pretrained('Helsinki-NLP/opus-mt-en-fr')
+
+    #translating from English to French
+    encoded_sentence = target_tokenizer.prepare_seq2seq_batch([sentence],return_tensors = 'pt')
+    translation = target_model.generate(**encoded_sentence)
+    translated_sentence = target_tokenizer.batch_decode(translation, skip_special_tokens=True)[0]
+
+    #translating from French to English
+    encoded_sentence = source_tokenizer.prepare_seq2seq_batch([translated_sentence],return_tensors = 'pt')
+    back_translation = source_model.generate(**encoded_sentence)
+    back_translated_sentence = source_tokenizer.batch_decode(back_translation, skip_special_tokens=True)[0]
+
+    return back_translated_sentence
+
 file = open("Data/SICK.txt", "r")
 lines = file.readlines()
 file.close()
@@ -219,6 +246,26 @@ Generating Sick Dataset (Training) augmented using Random Stop Word Insertion
 
 #     new_sentence_1 = insertRandomStopWord(SENTENCES_1[i])
 #     new_sentence_2 = insertRandomStopWord(SENTENCES_2[i])
+#     line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+#     file.write(line.lower())
+# file.close()
+
+"""
+Generating Sick Dataset (Training) augmented using Back Translation
+"""
+# file = open("Data/data_back_translation.txt", "w")
+# for i in range(0,int(NUM_SAMPLES/2)):
+#     line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+#     file.write(line.lower())
+
+#     new_sentence_1 = generateBackTranslatedSentence(SENTENCES_1[i])
+#     new_sentence_2 = generateBackTranslatedSentence(SENTENCES_2[i])
+#     line = new_sentence_1 + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+#     file.write(line.lower())
+
+#     line = SENTENCES_1[i] + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+#     file.write(line.lower())
+
 #     line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
 #     file.write(line.lower())
 # file.close()
