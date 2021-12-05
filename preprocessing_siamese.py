@@ -19,11 +19,14 @@ import torch
 from transformers import MarianMTModel, MarianTokenizer
 
 NUM_SAMPLES = 0
+LAMBDA = 0.2 #replcae with beta distribution
+EMBEDDING_LENGTH = 300
 
 SENTENCES_1 = []
 SENTENCES_2 = []
 SIMILARITY_SCORES = []
 STOPWORDS = []
+VOCABULARY = {}
 
 """
 Function to tokenize strings
@@ -215,6 +218,57 @@ def generateSynonymReplacedSentence(sentence):
     new_sentence += "."
     return new_sentence
 
+"""
+Function to generate a sentence through mixup
+Input: Indices of two sentences to be mixedup
+Output: Mixedup sentence in vector form
+"""
+def generateMixedupSentence(m, n):
+    tokens_m = generateTokens(SENTENCES_1[m])
+    tokens_n = generateTokens(SENTENCES_1[n])
+
+    line = []
+
+    new_sentence_1 = torch.empty((max(len(tokens_m),len(tokens_n)),EMBEDDING_LENGTH))
+    for i in range(0,max(len(tokens_m),len(tokens_n))):
+        if i < len(tokens_m):
+            embedding_m = WORD_EMBEDDINGS[VOCABULARY[tokens_m[i]]]
+        else:
+            embedding_n = torch.zeros((1,300))
+
+        if i < len(tokens_n):
+            embedding_n = WORD_EMBEDDINGS[VOCABULARY[tokens_n[i]]]
+        else:
+            embedding_n = torch.zeros((1,300))
+
+        new_sentence_1[i] = LAMBDA*embedding_m + (1 - LAMBDA)*embedding_n
+    line.append(new_sentence_1)
+
+    tokens_m = generateTokens(SENTENCES_2[m])
+    tokens_n = generateTokens(SENTENCES_2[n])
+
+    new_sentence_2 = torch.empty((max(len(tokens_m),len(tokens_n)),EMBEDDING_LENGTH))
+    for i in range(0,max(len(tokens_m),len(tokens_n))):
+        if i < len(tokens_m):
+            embedding_m = WORD_EMBEDDINGS[VOCABULARY[tokens_m[i]]]
+        else:
+            embedding_n = torch.zeros((1,300))
+
+        if i < len(tokens_n):
+            embedding_n = WORD_EMBEDDINGS[VOCABULARY[tokens_n[i]]]
+        else:
+            embedding_n = torch.zeros((1,300))
+
+        new_sentence_2[i] = LAMBDA*embedding_m + (1 - LAMBDA)*embedding_n
+    line.append(new_sentence_2)
+
+    score_m = SIMILARITY_SCORES[m]
+    score_n = SIMILARITY_SCORES[n]
+    new_score = LAMBDA*float(score_m) + (1 - LAMBDA)*float(score_n)
+    line.append(new_score)
+
+    return line
+
 file = open("Data/SICK.txt", "r")
 lines = file.readlines()
 file.close()
@@ -318,21 +372,49 @@ Generating Sick Dataset (Training) augmented using Back Translation
 """
 Generating Sick Dataset (Training) augmented using Synonym Replacement
 """
-file = open("Data/data_synonym_replaced.txt", "w")
+# file = open("Data/data_synonym_replaced.txt", "w")
+# for i in tqdm.tqdm(range(0,int(NUM_SAMPLES/2))):
+#     line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+#     file.write(line.lower())
+
+#     new_sentence_1 = generateSynonymReplacedSentence(SENTENCES_1[i])
+#     new_sentence_2 = generateSynonymReplacedSentence(SENTENCES_2[i])
+#     line = new_sentence_1 + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+#     file.write(line.lower())
+
+#     line = SENTENCES_1[i] + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+#     file.write(line.lower())
+
+#     new_sentence_1 = generateSynonymReplacedSentence(SENTENCES_1[i])
+#     new_sentence_2 = generateSynonymReplacedSentence(SENTENCES_2[i])
+#     line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+#     file.write(line.lower())
+# file.close()
+
+"""
+Generating Sick Dataset (Training) augmented using Mixup
+"""
+word_embeddings_file = open("Pickle/word_embeddings.pkl",'rb')
+WORD_EMBEDDINGS = pickle.load(word_embeddings_file)
+word_embeddings_file.close()
+
+vocabulary_file = open("Pickle/vocabulary_file.pkl",'rb')
+VOCABULARY = pickle.load(vocabulary_file)
+vocabulary_file.close()
+
+lines = []
 for i in tqdm.tqdm(range(0,int(NUM_SAMPLES/2))):
-    line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-    file.write(line.lower())
+    random_indices = np.array([np.random.randint(0,int(NUM_SAMPLES/2)), np.random.randint(0,int(NUM_SAMPLES/2)), np.random.randint(0,int(NUM_SAMPLES/2))])
 
-    new_sentence_1 = generateSynonymReplacedSentence(SENTENCES_1[i])
-    new_sentence_2 = generateSynonymReplacedSentence(SENTENCES_2[i])
-    line = new_sentence_1 + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-    file.write(line.lower())
+    lines.append(generateMixedupSentence(i,i))
+    lines.append(generateMixedupSentence(i,random_indices[0]))
+    lines.append(generateMixedupSentence(i,random_indices[1]))
+    lines.append(generateMixedupSentence(i,random_indices[2]))
 
-    line = SENTENCES_1[i] + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-    file.write(line.lower())
+mixedup_file = open("Pickle/mixedup_file.pkl",'wb')
+pickle.dump(lines,mixedup_file)
+mixedup_file.close()
 
-    new_sentence_1 = generateSynonymReplacedSentence(SENTENCES_1[i])
-    new_sentence_2 = generateSynonymReplacedSentence(SENTENCES_2[i])
-    line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-    file.write(line.lower())
-file.close()
+mixedup_file = open("Pickle/mixedup_file.pkl",'rb')
+MIXEDUP = pickle.load(mixedup_file)
+mixedup_file.close()
