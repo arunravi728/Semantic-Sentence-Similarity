@@ -83,22 +83,6 @@ def parseData(lines):
     return sentences_1, sentences_2, similarity_scores
 
 """
-Function to generate synonyms of a word from WordNet
-Input: Word
-Output: List of synonyms and similarity scores from WordNet
-"""
-def generateSynonyms(word):
-    if(len(wordnet.synsets(word)) != 0):
-        string = wordnet.synsets(word)[0]
-    synonyms = []
-    for synonym in wordnet.synsets(word):
-        for lemma in synonym.lemmas():
-            if(lemma.name().lower() != word.lower() and lemma.name().lower() not in synonyms):
-                synonyms.append(tuple((lemma.name().replace("_", " ").replace("-", " ").lower(),string.wup_similarity(synonym))))
-    
-    return synonyms
-
-"""
 Function to randomly delete a stop word from a sentence
 Input: Sentence
 Output: Sentence with a stop word deleted
@@ -158,17 +142,78 @@ def generateBackTranslatedSentence(sentence):
     target_tokenizer = MarianTokenizer.from_pretrained('Helsinki-NLP/opus-mt-en-fr')
     target_model = MarianMTModel.from_pretrained('Helsinki-NLP/opus-mt-en-fr')
 
-    #translating from English to French
+    # translating from English to French
     encoded_sentence = target_tokenizer.prepare_seq2seq_batch([sentence],return_tensors = 'pt')
     translation = target_model.generate(**encoded_sentence)
     translated_sentence = target_tokenizer.batch_decode(translation, skip_special_tokens=True)[0]
 
-    #translating from French to English
+    # translating from French to English
     encoded_sentence = source_tokenizer.prepare_seq2seq_batch([translated_sentence],return_tensors = 'pt')
     back_translation = source_model.generate(**encoded_sentence)
     back_translated_sentence = source_tokenizer.batch_decode(back_translation, skip_special_tokens=True)[0]
 
     return back_translated_sentence
+
+"""
+Function to check if synonym exists in WordNet
+Input: Word
+Output: True/False
+"""
+def doesSynonymExist(word):
+    exists = False
+    for synonym in wordnet.synsets(word):
+        for lemma in synonym.lemmas():
+            if(lemma.name().lower() != word.lower()):
+                exists = True
+    return exists
+
+"""
+Function to generate synonyms of a word from WordNet
+Input: Word
+Output: List of synonyms and similarity scores from WordNet
+"""
+def generateSynonyms(word):
+    if(len(wordnet.synsets(word)) != 0):
+        string = wordnet.synsets(word)[0]
+    synonyms = []
+    for synonym in wordnet.synsets(word):
+        for lemma in synonym.lemmas():
+            if(lemma.name().lower() != word.lower() and lemma.name().lower() not in synonyms):
+                synonyms.append(tuple((lemma.name().replace("_", " ").replace("-", " ").lower(),string.wup_similarity(synonym))))
+    
+    return synonyms
+
+"""
+Function to generate synonym replaced sentence
+Input: Sentence
+Output: Synonym replaced sentence sentence
+"""
+def generateSynonymReplacedSentence(sentence):
+    tokens = generateTokens(sentence)
+    max_similarity = 0
+    max_similarity_index = 0
+    synonym = ""
+
+    for i,token in enumerate(tokens):
+        if token not in STOPWORDS:
+            if(doesSynonymExist(token) == True):
+                synonyms = generateSynonyms(token)
+                synonyms = sorted(synonyms, key = lambda x: x[1], reverse = True)
+                if(synonyms[0][1] > max_similarity):
+                    max_similarity_index = i
+                    max_similarity = synonyms[0][1]
+                    synonym = synonyms[0][0]
+    
+    words = []
+    for i,token in enumerate(tokens):
+        if i != max_similarity_index:
+            words.append(token)
+        else:
+            words.append(synonym)
+    
+    new_sentence = " ".join(words)
+    new_sentence += "."
+    return new_sentence
 
 file = open("Data/SICK.txt", "r")
 lines = file.readlines()
@@ -269,3 +314,25 @@ Generating Sick Dataset (Training) augmented using Back Translation
 #     line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
 #     file.write(line.lower())
 # file.close()
+
+"""
+Generating Sick Dataset (Training) augmented using Synonym Replacement
+"""
+file = open("Data/data_synonym_replaced.txt", "w")
+for i in tqdm.tqdm(range(0,int(NUM_SAMPLES/2))):
+    line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
+
+    new_sentence_1 = generateSynonymReplacedSentence(SENTENCES_1[i])
+    new_sentence_2 = generateSynonymReplacedSentence(SENTENCES_2[i])
+    line = new_sentence_1 + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
+
+    line = SENTENCES_1[i] + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
+
+    new_sentence_1 = generateSynonymReplacedSentence(SENTENCES_1[i])
+    new_sentence_2 = generateSynonymReplacedSentence(SENTENCES_2[i])
+    line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
+file.close()
