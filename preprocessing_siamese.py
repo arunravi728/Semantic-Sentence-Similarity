@@ -19,7 +19,7 @@ import torch
 from transformers import MarianMTModel, MarianTokenizer
 
 NUM_SAMPLES = 0
-LAMBDA = 0.2 #replcae with beta distribution
+LAMBDA = np.random.beta(0.4,0.4)
 EMBEDDING_LENGTH = 300
 
 SENTENCES_1 = []
@@ -418,3 +418,5 @@ mixedup_file.close()
 mixedup_file = open("Pickle/mixedup_file.pkl",'rb')
 MIXEDUP = pickle.load(mixedup_file)
 mixedup_file.close()
+
+print(len(MIXEDUP))
