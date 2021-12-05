@@ -13,20 +13,21 @@ import math
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from gensim.models import KeyedVectors
+import gensim
 
 #Reading word embeddings
 
-word_embeddings_file = open("Pickle/word_embeddings.pkl",'rb')
+'''word_embeddings_file = open("Pickle/word_embeddings.pkl",'rb')
 WORD_EMBEDDINGS = pickle.load(word_embeddings_file)
 word_embeddings_file.close()
 
-word2vec_model = KeyedVectors.load_word2vec_format('GoogleNews-vectors-negative300.bin', binary = True)
+word2vec_model = KeyedVectors.load_word2vec_format('GoogleNews-vectors-negative300.bin', binary = True)'''
 
 #Reading vocabulary
 
-vocabulary_file = open("Pickle/vocabulary_file.pkl",'rb')
+'''vocabulary_file = open("Pickle/vocabulary_file.pkl",'rb')
 VOCABULARY = pickle.load(vocabulary_file)
-vocabulary_file.close()
+vocabulary_file.close()'''
 
 #Dimension of Input Word Vectors
 H_in = 300
@@ -136,9 +137,41 @@ sentences = []
 lines = file.readlines()
 
 """
-Preparing Training Set for the training loop
+Training custom word2vec model using Gensim on SICK (augmented)
 """
-#variable to compute length of longest sentence to fix sequence leng
+
+word2vec_data = []
+
+for line in lines[1:]:
+
+    line = line.split('\t')
+
+    s1 = []
+
+    s2 = []
+
+    for word in generateTokens(line[1]):
+        s1.append(word)
+
+    for word in generateTokens(line[2]):
+        s2.append(word)
+    
+    word2vec_data.append(s1)
+
+    word2vec_data.append(s2)
+
+word2vec_model = gensim.models.Word2Vec(word2vec_data, vector_size = 300, window = 5, min_count = 1, workers = 10, epochs = 10, sg = 1)
+
+word2vec_model.save("word2vec.model")
+
+print("Custom word2vec training using Gensim on SICK (augmented) done !")
+
+
+"""
+Preparing Training Set for the training loop using already pre-trained word2vec on Google News Dataset
+"""
+
+'''#variable to compute length of longest sentence to fix sequence leng
 leng_long = 0
 
 for line in lines[1:]:
@@ -179,8 +212,48 @@ for line in lines[1:]:
     #storing the sentence embeddings in Training Set
     sentences.append((sent1_embedding, sent2_embedding, torch.tensor(float(line[4]))))
 
-LONGEST_LENGTH = leng_long
+LONGEST_LENGTH = leng_long'''
 
+"""
+Preparing Training Set for custom word2vec model trained using Gensim on SICK (augmented)
+"""
+
+#variable to compute length of longest sentence to fix sequence leng
+leng_long = 0
+
+for line in lines[1:]:
+
+    #splitting by tab space
+    line = line.split('\t')
+
+    #tokenizing sentence 1
+    sent1_tokenized = generateTokens(line[1])
+
+    #Finding the longest sentence
+    leng_long = len(sent1_tokenized) if len(sent1_tokenized) > leng_long else leng_long
+
+    #storing word vectors of sentence 1
+    sent1_embedding = []
+
+    for word in sent1_tokenized:
+        sent1_embedding.append(torch.from_numpy(word2vec_model.wv[word]))
+
+    #tokenizing sentence 2
+    sent2_tokenized = generateTokens(line[2])
+
+    #Finding the longest sentence
+    leng_long = len(sent2_tokenized) if len(sent2_tokenized) > leng_long else leng_long
+
+    #storing word vectors of sentence 2
+    sent2_embedding = []
+
+    for word in sent2_tokenized:
+        sent2_embedding.append(torch.from_numpy(word2vec_model.wv[word]))
+
+    #storing the sentence embeddings in Training Set
+    sentences.append((sent1_embedding, sent2_embedding, torch.tensor(float(line[4]))))
+
+LONGEST_LENGTH = leng_long
 
 #At this point, remember all word embeddings and labels are converted into Tensors!
 
@@ -293,5 +366,5 @@ plt.plot(x, losses)
 plt.show()
 
 #Saving trained Model
-torch.save(model.state_dict(), "model_word2vec.pt")
+torch.save(model.state_dict(), "model_word2vec_custom.pt")
 print("Model Saved Successfully")

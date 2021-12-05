@@ -96,9 +96,9 @@ model = Siamese(H_in, H_hidden)
 
 model.load_state_dict(torch.load("model.pt"))
 
-sent1 = "A trumpet is being played by a person"
+sent1 = "A parrot is speaking"
 
-sent2 = "A person is playing a trumpet"
+sent2 = "The parrot is silent in front of the microphone"
 
 #Retrieving word vectors
 
@@ -132,4 +132,6 @@ sent2_embedding = torch.stack(sent2_embedding).reshape(1,LONGEST_LENGTH, H_in)
 
 scores = model(sent1_embedding, sent2_embedding)
 
-print(scores)
+#Rescaling scores back to [0,5]
+
+print(scores.item()*5)

@@ -4,6 +4,7 @@ import torch.nn as nn
 import math
 import pickle
 import re
+from gensim.models import Word2Vec
 from gensim.models import KeyedVectors
 
 #Re-implement this function here 
@@ -20,17 +21,20 @@ H_hidden = 50
 
 #Reading word embeddings
 
-word_embeddings_file = open("Pickle/word_embeddings.pkl",'rb')
+'''word_embeddings_file = open("Pickle/word_embeddings.pkl",'rb')
 WORD_EMBEDDINGS = pickle.load(word_embeddings_file)
 word_embeddings_file.close()
 
-word2vec_model = KeyedVectors.load_word2vec_format('GoogleNews-vectors-negative300.bin', binary = True)
+word2vec_model = KeyedVectors.load_word2vec_format('GoogleNews-vectors-negative300.bin', binary = True)'''
+
+#Loading custom word2vec model trained using gensim on SICK
+word2vec_model = Word2Vec.load("word2vec.model")
 
 #Reading vocabulary
 
-vocabulary_file = open("Pickle/vocabulary_file.pkl",'rb')
+'''vocabulary_file = open("Pickle/vocabulary_file.pkl",'rb')
 VOCABULARY = pickle.load(vocabulary_file)
-vocabulary_file.close()
+vocabulary_file.close()'''
 
 """
 Function to generate tokens
@@ -97,15 +101,15 @@ model = Siamese(H_in, H_hidden)
 
 #Loading saved model
 
-model.load_state_dict(torch.load("model_word2vec.pt"))
+model.load_state_dict(torch.load("model_word2vec_custom.pt"))
 
-sent1 = "A trumpet is being played by a person"
+sent1 = "A parrot is speaking"
 
-sent2 = "A person is playing a trumpet"
+sent2 = "The parrot is silent in front of the microphone"
 
-#Retrieving word vectors
+#Retrieving word vectors from Gensim's pre-trained model on Google News Dataset
 
-sent1_embedding = []
+'''sent1_embedding = []
 
 sent2_embedding = []
 
@@ -119,7 +123,19 @@ for word in generateTokens(sent2):
     if word in word2vec_model:
         sent2_embedding.append(torch.from_numpy(word2vec_model[word]))
     else:
-        sent2_embedding.append(WORD_EMBEDDINGS[VOCABULARY[word]])
+        sent2_embedding.append(WORD_EMBEDDINGS[VOCABULARY[word]])'''
+
+#Retrieving word vectors from custom word2vec model trained using Gensim on SICK
+
+sent1_embedding = []
+
+sent2_embedding = []
+
+for word in generateTokens(sent1):
+    sent1_embedding.append(torch.from_numpy(word2vec_model.wv[word]))
+
+for word in generateTokens(sent2):
+    sent2_embedding.append(torch.from_numpy(word2vec_model.wv[word]))
 
 #Padding with zeros to match length of longest sequence
 
@@ -141,4 +157,6 @@ sent2_embedding = torch.stack(sent2_embedding).reshape(1,LONGEST_LENGTH, H_in)
 
 scores = model(sent1_embedding, sent2_embedding)
 
-print(scores)
+#Rescaling scores back to [0,5]
+
+print(scores.item()*5)
