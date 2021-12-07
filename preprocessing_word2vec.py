@@ -134,7 +134,7 @@ def generateTrainingData(tokens):
 text = getText("Data/data_word2vec.txt")
 sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?)\s', text)
 
-data_file = open("data_word2vec.pkl",'wb')
+data_file = open("Pickle/data_word2vec.pkl",'wb')
 pickle.dump(sentences,data_file)
 data_file.close()
 
@@ -206,3 +206,4 @@ train_data_file.close()
 train_data_file = open("Pickle/train_data_file.pkl",'rb')
 train_data = pickle.load(train_data_file)
 train_data_file.close()
+print(len(train_data))

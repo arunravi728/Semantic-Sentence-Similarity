@@ -19,6 +19,8 @@ import torch
 from transformers import MarianMTModel, MarianTokenizer
 
 NUM_SAMPLES = 0
+NUM_TRAIN = 0
+NUM_TEST = 0
 LAMBDA = np.random.beta(0.4,0.4)
 EMBEDDING_LENGTH = 300
 
@@ -277,119 +279,121 @@ STOPWORDS = stopwords.words('english')
 SENTENCES_1, SENTENCES_2, SIMILARITY_SCORES = parseData(lines)
 
 NUM_SAMPLES = len(SENTENCES_1)
+NUM_TRAIN = 0.8*NUM_SAMPLES
+NUM_TEST = 0.2*NUM_SAMPLES
 
 """
 Generating non-augmented Sick Dataset
 """
-# file = open("Data/data_sick.txt", "w")
-# for i in range(0,NUM_SAMPLES):
-#     line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-#     file.write(line.lower())
-# file.close()
+file = open("Data/data_sick.txt", "w")
+for i in range(0,NUM_SAMPLES):
+    line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
+file.close()
 
 """
 Generating non-augmented Sick Dataset (Training)
 """
-# file = open("Data/data_sick_train.txt", "w")
-# for i in range(0,int(NUM_SAMPLES/2)):
-#     line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-#     file.write(line.lower())
-# file.close()
+file = open("Data/data_sick_train.txt", "w")
+for i in range(0,int(NUM_TRAIN)):
+    line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
+file.close()
 
 """
 Generating non-augmented Sick Dataset (Test)
 """
-# file = open("Data/data_sick_test.txt", "w")
-# for i in range(int(NUM_SAMPLES/2),NUM_SAMPLES):
-#     line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-#     file.write(line.lower())
-# file.close()
+file = open("Data/data_sick_test.txt", "w")
+for i in range(int(NUM_TRAIN),int(NUM_SAMPLES)):
+    line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
+file.close()
 
 """
 Generating Sick Dataset (Training) augmented using Random Stop Word Deletion
 """
-# file = open("Data/data_random_deletion.txt", "w")
-# for i in range(0,int(NUM_SAMPLES/2)):
-#     line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-#     file.write(line.lower())
+file = open("Data/data_random_deletion.txt", "w")
+for i in range(0,int(NUM_TRAIN)):
+    line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
 
-#     new_sentence = deleteRandomStopWord(SENTENCES_1[i])
-#     line = new_sentence + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-#     file.write(line.lower())
+    new_sentence = deleteRandomStopWord(SENTENCES_1[i])
+    line = new_sentence + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
 
-#     new_sentence = deleteRandomStopWord(SENTENCES_2[i])
-#     line = SENTENCES_1[i] + "\t" + new_sentence + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-#     file.write(line.lower())
+    new_sentence = deleteRandomStopWord(SENTENCES_2[i])
+    line = SENTENCES_1[i] + "\t" + new_sentence + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
 
-#     new_sentence_1 = deleteRandomStopWord(SENTENCES_1[i])
-#     new_sentence_2 = deleteRandomStopWord(SENTENCES_2[i])
-#     line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-#     file.write(line.lower())
-# file.close()
+    new_sentence_1 = deleteRandomStopWord(SENTENCES_1[i])
+    new_sentence_2 = deleteRandomStopWord(SENTENCES_2[i])
+    line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
+file.close()
 
 """
 Generating Sick Dataset (Training) augmented using Random Stop Word Insertion
 """
-# file = open("Data/data_random_insertion.txt", "w")
-# for i in range(0,int(NUM_SAMPLES/2)):
-#     line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-#     file.write(line.lower())
+file = open("Data/data_random_insertion.txt", "w")
+for i in range(0,int(NUM_TRAIN)):
+    line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
 
-#     new_sentence = insertRandomStopWord(SENTENCES_1[i])
-#     line = new_sentence + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-#     file.write(line.lower())
+    new_sentence = insertRandomStopWord(SENTENCES_1[i])
+    line = new_sentence + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
 
-#     new_sentence = insertRandomStopWord(SENTENCES_2[i])
-#     line = SENTENCES_1[i] + "\t" + new_sentence + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-#     file.write(line.lower())
+    new_sentence = insertRandomStopWord(SENTENCES_2[i])
+    line = SENTENCES_1[i] + "\t" + new_sentence + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
 
-#     new_sentence_1 = insertRandomStopWord(SENTENCES_1[i])
-#     new_sentence_2 = insertRandomStopWord(SENTENCES_2[i])
-#     line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-#     file.write(line.lower())
-# file.close()
+    new_sentence_1 = insertRandomStopWord(SENTENCES_1[i])
+    new_sentence_2 = insertRandomStopWord(SENTENCES_2[i])
+    line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
+file.close()
 
 """
 Generating Sick Dataset (Training) augmented using Back Translation
 """
-# file = open("Data/data_back_translation.txt", "w")
-# for i in range(0,int(NUM_SAMPLES/2)):
-#     line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-#     file.write(line.lower())
+file = open("Data/data_back_translation.txt", "w")
+for i in range(0,int(NUM_TRAIN)):
+    line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
 
-#     new_sentence_1 = generateBackTranslatedSentence(SENTENCES_1[i])
-#     new_sentence_2 = generateBackTranslatedSentence(SENTENCES_2[i])
-#     line = new_sentence_1 + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-#     file.write(line.lower())
+    new_sentence_1 = generateBackTranslatedSentence(SENTENCES_1[i])
+    new_sentence_2 = generateBackTranslatedSentence(SENTENCES_2[i])
+    line = new_sentence_1 + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
 
-#     line = SENTENCES_1[i] + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-#     file.write(line.lower())
+    line = SENTENCES_1[i] + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
 
-#     line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-#     file.write(line.lower())
-# file.close()
+    line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
+file.close()
 
 """
 Generating Sick Dataset (Training) augmented using Synonym Replacement
 """
-# file = open("Data/data_synonym_replaced.txt", "w")
-# for i in tqdm.tqdm(range(0,int(NUM_SAMPLES/2))):
-#     line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-#     file.write(line.lower())
+file = open("Data/data_synonym_replaced.txt", "w")
+for i in tqdm.tqdm(range(0,int(NUM_TRAIN))):
+    line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
 
-#     new_sentence_1 = generateSynonymReplacedSentence(SENTENCES_1[i])
-#     new_sentence_2 = generateSynonymReplacedSentence(SENTENCES_2[i])
-#     line = new_sentence_1 + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-#     file.write(line.lower())
+    new_sentence_1 = generateSynonymReplacedSentence(SENTENCES_1[i])
+    new_sentence_2 = generateSynonymReplacedSentence(SENTENCES_2[i])
+    line = new_sentence_1 + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
 
-#     line = SENTENCES_1[i] + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-#     file.write(line.lower())
+    line = SENTENCES_1[i] + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
 
-#     new_sentence_1 = generateSynonymReplacedSentence(SENTENCES_1[i])
-#     new_sentence_2 = generateSynonymReplacedSentence(SENTENCES_2[i])
-#     line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
-#     file.write(line.lower())
-# file.close()
+    new_sentence_1 = generateSynonymReplacedSentence(SENTENCES_1[i])
+    new_sentence_2 = generateSynonymReplacedSentence(SENTENCES_2[i])
+    line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+    file.write(line.lower())
+file.close()
 
 """
 Generating Sick Dataset (Training) augmented using Mixup
@@ -403,7 +407,7 @@ VOCABULARY = pickle.load(vocabulary_file)
 vocabulary_file.close()
 
 lines = []
-for i in tqdm.tqdm(range(0,int(NUM_SAMPLES/2))):
+for i in tqdm.tqdm(range(0,NUM_TRAIN)):
     random_indices = np.array([np.random.randint(0,int(NUM_SAMPLES/2)), np.random.randint(0,int(NUM_SAMPLES/2)), np.random.randint(0,int(NUM_SAMPLES/2))])
 
     lines.append(generateMixedupSentence(i,i))
