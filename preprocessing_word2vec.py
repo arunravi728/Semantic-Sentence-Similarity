@@ -7,7 +7,6 @@ import tqdm
 from loguru import logger
 
 import numpy as np
-from numpy.core.numeric import NaN
 import pandas as pd
 import matplotlib.pyplot as plt
 
