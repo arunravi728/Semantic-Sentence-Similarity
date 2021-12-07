@@ -6,37 +6,21 @@ import random
 from tqdm import tqdm
 import pickle
 
-WINDOW_SIZE = 5             # WINDOW_SIZE number of words on either side of the input word
-VOCABULARY_SIZE = 0
-CORPUS_SIZE = 0
-
-VOCABULARY = {}
-UNIGRAM_RATIOS = []
-BERNOULLI_MAP = []          # Bernoulli Map to help with subsampling
-
 #hidden dimensionality of the word embeddings
-N = 50
+N = 300
 
 #Context Size
 C = 5
-
-#Read Vocabulary Here
-#VOCABULARY = {}
-
-#Entire Corpus Stored Here
 
 #Learning Rate for SGD
 alpha = 0.001
 
 #No. of Negative Samples
-K = 2
+K = 5
 
 #Number of Epochs
 num_epochs = 3
 
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 """
 Importing Vocabulary from pre-processing.py
 """
@@ -45,38 +29,6 @@ vocabulary_file = open("Pickle/vocabulary_file.pkl",'rb')
 VOCABULARY = pickle.load(vocabulary_file)
 vocabulary_file.close()
 
-
-VOCABULARY_SIZE = len(VOCABULARY)
-
-"""
-Importing Tokenized Corpus from pre-processing.py
-"""
-
-token_vocabulary_file = open("Pickle/token_vocabulary_file.pkl",'rb')
-tokens_vocab = pickle.load(token_vocabulary_file)
-token_vocabulary_file.close()
-
-"""
-Importing Training Data from pre-processing.py
-"""
-train_data_file = open("Pickle/train_data_file.pkl",'rb')
-train_data = pickle.load(train_data_file)
-train_data_file.close()
-
-"""
-Importing Unigram Ratios from pre-processing.py
-"""
-unigram_file = open("Pickle/unigram_ratios_file.pkl",'rb')
-UNIGRAM_RATIOS = pickle.load(unigram_file)
-unigram_file.close()
-
-"""
-Importing Vocabulary from pre-processing.py
-"""
-
-vocabulary_file = open("Pickle/vocabulary_file.pkl",'rb')
-VOCABULARY = pickle.load(vocabulary_file)
-vocabulary_file.close()
 
 VOCABULARY_SIZE = len(VOCABULARY)
 
@@ -127,12 +79,6 @@ def generateNoiseDist():
 
     return noise_distribution
 
-def generateOneHotEncoding(word):
-    one_hot_encoded_vector = torch.zeros(VOCABULARY_SIZE)
-    one_hot_encoded_vector[VOCABULARY[word]] = 1
-    return one_hot_encoded_vector
-
-
 """Class implementing the Skip-Gram Model from scratch"""
 
 class SkipGram():
@@ -140,8 +86,8 @@ class SkipGram():
     Constructor initializes input and output weight matrices
     """
     def __init__(self):
-        self.W_in = ((-2/math.sqrt(N))*torch.rand(VOCABULARY_SIZE,N) + 1/math.sqrt(N)).to(device)
-        self.W_out = ((-2/math.sqrt(N))*torch.rand(N,VOCABULARY_SIZE) + 1/math.sqrt(N)).to(device)
+        self.W_in = ((-2/math.sqrt(N))*torch.rand(VOCABULARY_SIZE,N) + 1/math.sqrt(N))
+        self.W_out = ((-2/math.sqrt(N))*torch.rand(N,VOCABULARY_SIZE) + 1/math.sqrt(N))
 
     """
     Function to perform a forward pass through the Skip Gram
@@ -158,9 +104,9 @@ class SkipGram():
     Input : Noise Distribution, input string, one hot encoded input, context string
     Output : All the gradients
     """
-    def gradients(self, noise_distribution, inp_index, input_encoded, context):
+    def gradients(self, noise_distribution, inp_index, context):
 
-        self.inp_grad = torch.zeros(N).to(device)
+        self.inp_grad = torch.zeros(N)
         
         for id in range(len(context)):
 
@@ -198,25 +144,26 @@ Format of each training instance
 """
 
 #Generates the special unigram frequencies from which to negative sample from
-noise_distribution = torch.Tensor(generateNoiseDist()).to(device)
+noise_distribution = torch.Tensor(generateNoiseDist())
 
-skip_gram = SkipGram().to(device)
-
-
-
+skip_gram = SkipGram()
 
 for epoch in range(num_epochs):
     for idx, (inp, context) in enumerate(tqdm(train_data)):
 
-        # print(inp)
-        input_encoded = generateOneHotEncoding(inp).to(device)
         inp_index = VOCABULARY[inp]
-        # print(inp_index)
 
-        context = torch.tensor([VOCABULARY[c] for c in context]).to(device)
+        context = torch.tensor([VOCABULARY[c] for c in context])
 
-        #context = generateOneHotEncoding(context).to(device)
+        skip_gram.gradients(noise_distribution, inp_index, context)
 
-        #skip_gram.forward(input_encoded)
 
-        skip_gram.gradients(noise_distribution, inp_index, input_encoded, context)
+#Writing the Matrix of i/p word vectors to a pickle file
+
+print(skip_gram.W_in)
+
+print(skip_gram.W_in.shape)
+
+word_embeddings_file = open("Pickle/word_embeddings_file.pkl",'wb')
+pickle.dump(skip_gram.W_in, word_embeddings_file)
+word_embeddings_file.close()
