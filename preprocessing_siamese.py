@@ -18,6 +18,8 @@ from nltk.corpus import stopwords
 import torch
 from transformers import MarianMTModel, MarianTokenizer
 
+from gensim.models import Word2Vec
+
 NUM_SAMPLES = 0
 NUM_TRAIN = 0
 NUM_TEST = 0
@@ -28,7 +30,6 @@ SENTENCES_1 = []
 SENTENCES_2 = []
 SIMILARITY_SCORES = []
 STOPWORDS = []
-VOCABULARY = {}
 
 """
 Function to tokenize strings
@@ -234,16 +235,16 @@ def generateMixedupSentence(m, n):
     new_sentence_1 = torch.empty((max(len(tokens_m),len(tokens_n)),EMBEDDING_LENGTH))
     for i in range(0,max(len(tokens_m),len(tokens_n))):
         if i < len(tokens_m):
-            embedding_m = WORD_EMBEDDINGS[VOCABULARY[tokens_m[i]]]
+            embedding_m = WORD_EMBEDDINGS.wv[tokens_m[i]]
         else:
             embedding_n = torch.zeros((1,300))
 
         if i < len(tokens_n):
-            embedding_n = WORD_EMBEDDINGS[VOCABULARY[tokens_n[i]]]
+            embedding_n = WORD_EMBEDDINGS.wv[tokens_n[i]]
         else:
             embedding_n = torch.zeros((1,300))
 
-        new_sentence_1[i] = LAMBDA*embedding_m + (1 - LAMBDA)*embedding_n
+        new_sentence_1[i] = LAMBDA*torch.tensor(embedding_m) + (1 - LAMBDA)*torch.tensor(embedding_n)
     line.append(new_sentence_1)
 
     tokens_m = generateTokens(SENTENCES_2[m])
@@ -252,16 +253,16 @@ def generateMixedupSentence(m, n):
     new_sentence_2 = torch.empty((max(len(tokens_m),len(tokens_n)),EMBEDDING_LENGTH))
     for i in range(0,max(len(tokens_m),len(tokens_n))):
         if i < len(tokens_m):
-            embedding_m = WORD_EMBEDDINGS[VOCABULARY[tokens_m[i]]]
+            embedding_m = WORD_EMBEDDINGS.wv[tokens_m[i]]
         else:
             embedding_n = torch.zeros((1,300))
 
         if i < len(tokens_n):
-            embedding_n = WORD_EMBEDDINGS[VOCABULARY[tokens_n[i]]]
+            embedding_n = WORD_EMBEDDINGS.wv[tokens_n[i]]
         else:
             embedding_n = torch.zeros((1,300))
 
-        new_sentence_2[i] = LAMBDA*embedding_m + (1 - LAMBDA)*embedding_n
+        new_sentence_2[i] = LAMBDA*torch.tensor(embedding_m) + (1 - LAMBDA)*torch.tensor(embedding_n)
     line.append(new_sentence_2)
 
     score_m = SIMILARITY_SCORES[m]
@@ -398,16 +399,10 @@ file.close()
 """
 Generating Sick Dataset (Training) augmented using Mixup
 """
-word_embeddings_file = open("Pickle/word_embeddings.pkl",'rb')
-WORD_EMBEDDINGS = pickle.load(word_embeddings_file)
-word_embeddings_file.close()
-
-vocabulary_file = open("Pickle/vocabulary_file.pkl",'rb')
-VOCABULARY = pickle.load(vocabulary_file)
-vocabulary_file.close()
+WORD_EMBEDDINGS = Word2Vec.load("Models/word2vec.model")
 
 lines = []
-for i in tqdm.tqdm(range(0,NUM_TRAIN)):
+for i in tqdm.tqdm(range(0,int(NUM_TRAIN))):
     random_indices = np.array([np.random.randint(0,int(NUM_SAMPLES/2)), np.random.randint(0,int(NUM_SAMPLES/2)), np.random.randint(0,int(NUM_SAMPLES/2))])
 
     lines.append(generateMixedupSentence(i,i))
