@@ -18,7 +18,7 @@ from nltk.corpus import stopwords
 import torch
 from transformers import MarianMTModel, MarianTokenizer
 
-from gensim.models import Word2Vec
+from gensim.models import Word2Vec, KeyedVectors
 
 NUM_SAMPLES = 0
 NUM_TRAIN = 0
@@ -30,6 +30,12 @@ SENTENCES_1 = []
 SENTENCES_2 = []
 SIMILARITY_SCORES = []
 STOPWORDS = []
+WORD_EMBEDDINGS = []
+OWN_EMBEDDINGS = []
+VOCABULARY = []
+
+#Model Variant (OWN_EMBEDDINGS, GOOGLE_NEWS, GENSIM_SKIP_GRAM)
+MODE = "GENSIM_SKIP_GRAM"
 
 """
 Function to tokenize strings
@@ -232,37 +238,71 @@ def generateMixedupSentence(m, n):
 
     line = []
 
-    new_sentence_1 = torch.empty((max(len(tokens_m),len(tokens_n)),EMBEDDING_LENGTH))
+    new_sentence_1 = []
     for i in range(0,max(len(tokens_m),len(tokens_n))):
         if i < len(tokens_m):
-            embedding_m = WORD_EMBEDDINGS.wv[tokens_m[i]]
+            if MODE == "GENSIM_SKIP_GRAM":
+                embedding_m = WORD_EMBEDDINGS.wv[tokens_m[i]]
+            elif MODE == "OWN_EMBEDDINGS":
+                embedding_m = OWN_EMBEDDINGS[VOCABULARY[tokens_m[i]]]
+            elif MODE == "GOOGLE_NEWS":
+                if tokens_m[i] in WORD_EMBEDDINGS:
+                    embedding_m = torch.from_numpy(WORD_EMBEDDINGS[tokens_m[i]])
+                else:
+                    embedding_m = OWN_EMBEDDINGS[VOCABULARY[tokens_m[i]]]
         else:
-            embedding_n = torch.zeros((1,300))
+            embedding_m = torch.zeros((300))
 
         if i < len(tokens_n):
-            embedding_n = WORD_EMBEDDINGS.wv[tokens_n[i]]
+            if MODE == "GENSIM_SKIP_GRAM":
+                embedding_n = WORD_EMBEDDINGS.wv[tokens_n[i]]
+            elif MODE == "OWN_EMBEDDINGS":
+                embedding_n = OWN_EMBEDDINGS[VOCABULARY[tokens_n[i]]]
+            elif MODE == "GOOGLE_NEWS":
+                if tokens_n[i] in WORD_EMBEDDINGS:
+                    embedding_n = torch.from_numpy(WORD_EMBEDDINGS[tokens_n[i]])
+                else:
+                    embedding_n = OWN_EMBEDDINGS[VOCABULARY[tokens_n[i]]]
         else:
-            embedding_n = torch.zeros((1,300))
+            embedding_n = torch.zeros((300))
 
-        new_sentence_1[i] = LAMBDA*torch.tensor(embedding_m) + (1 - LAMBDA)*torch.tensor(embedding_n)
+        new_sentence_1.append(LAMBDA*torch.tensor(embedding_m) + (1 - LAMBDA)*torch.tensor(embedding_n))
+
     line.append(new_sentence_1)
 
     tokens_m = generateTokens(SENTENCES_2[m])
     tokens_n = generateTokens(SENTENCES_2[n])
 
-    new_sentence_2 = torch.empty((max(len(tokens_m),len(tokens_n)),EMBEDDING_LENGTH))
+    new_sentence_2 = []
     for i in range(0,max(len(tokens_m),len(tokens_n))):
         if i < len(tokens_m):
-            embedding_m = WORD_EMBEDDINGS.wv[tokens_m[i]]
+            if MODE == "GENSIM_SKIP_GRAM":
+                embedding_m = WORD_EMBEDDINGS.wv[tokens_m[i]]
+            elif MODE == "OWN_EMBEDDINGS":
+                embedding_m = OWN_EMBEDDINGS[VOCABULARY[tokens_m[i]]]
+            elif MODE == "GOOGLE_NEWS":
+                if tokens_m[i] in WORD_EMBEDDINGS:
+                    embedding_m = torch.from_numpy(WORD_EMBEDDINGS[tokens_m[i]])
+                else:
+                    embedding_m = OWN_EMBEDDINGS[VOCABULARY[tokens_m[i]]]
         else:
-            embedding_n = torch.zeros((1,300))
+            embedding_m = torch.zeros((300))
 
         if i < len(tokens_n):
-            embedding_n = WORD_EMBEDDINGS.wv[tokens_n[i]]
+            if MODE == "GENSIM_SKIP_GRAM":
+                embedding_n = WORD_EMBEDDINGS.wv[tokens_n[i]]
+            elif MODE == "OWN_EMBEDDINGS":
+                embedding_n = OWN_EMBEDDINGS[VOCABULARY[tokens_n[i]]]
+            elif MODE == "GOOGLE_NEWS":
+                if tokens_n[i] in WORD_EMBEDDINGS:
+                    embedding_n = torch.from_numpy(WORD_EMBEDDINGS[tokens_n[i]])
+                else:
+                    embedding_n = OWN_EMBEDDINGS[VOCABULARY[tokens_n[i]]]
         else:
-            embedding_n = torch.zeros((1,300))
+            embedding_n = torch.zeros((300))
 
-        new_sentence_2[i] = LAMBDA*torch.tensor(embedding_m) + (1 - LAMBDA)*torch.tensor(embedding_n)
+        new_sentence_2.append(LAMBDA*torch.tensor(embedding_m) + (1 - LAMBDA)*torch.tensor(embedding_n))
+
     line.append(new_sentence_2)
 
     score_m = SIMILARITY_SCORES[m]
@@ -412,19 +452,289 @@ Function to generate Sick Dataset (Training) augmented using Mixup
 def generateMixupData():
     lines = []
     for i in tqdm.tqdm(range(0,int(NUM_TRAIN))):
-        random_indices = np.array([np.random.randint(0,int(NUM_SAMPLES/2)), np.random.randint(0,int(NUM_SAMPLES/2)), np.random.randint(0,int(NUM_SAMPLES/2))])
+        random_indices = np.array([np.random.randint(0,int(NUM_TRAIN)), np.random.randint(0,int(NUM_TRAIN)), np.random.randint(0,int(NUM_TRAIN))])
 
         lines.append(generateMixedupSentence(i,i))
         lines.append(generateMixedupSentence(i,random_indices[0]))
         lines.append(generateMixedupSentence(i,random_indices[1]))
         lines.append(generateMixedupSentence(i,random_indices[2]))
 
-    mixedup_file = open("Pickle/mixedup_file.pkl",'wb')
+    if MODE == "GENSIM_SKIP_GRAM":
+        mixedup_file = open("Data/GS_mixedup_file.pkl",'wb')
+    elif MODE == "OWN_EMBEDDINGS":
+        mixedup_file = open("Data/OE_mixedup_file.pkl",'wb')
+    elif MODE == "GOOGLE_NEWS":
+        mixedup_file = open("Data/GN_mixedup_file.pkl",'wb')
+    
     pickle.dump(lines,mixedup_file)
     mixedup_file.close()
 
     print("Mixup Data Generated")
 
+"""
+Function to generate Word Embedded Sentences (Used for multiple data augmentations with Mixup)
+"""
+def generateWordEmbeddedSentences(sentence1, sentence2, score):
+    tokens_m = generateTokens(sentence1)
+    tokens_n = generateTokens(sentence2)
+
+    line = []
+
+    new_sentence_1 = []
+    for i in range(0,len(tokens_m)):
+        if MODE == "GENSIM_SKIP_GRAM":
+            embedding_m = WORD_EMBEDDINGS.wv[tokens_m[i]]
+        elif MODE == "OWN_EMBEDDINGS":
+            embedding_m = OWN_EMBEDDINGS[VOCABULARY[tokens_m[i]]]
+        elif MODE == "GOOGLE_NEWS":
+            if tokens_m[i] in WORD_EMBEDDINGS:
+                embedding_m = torch.from_numpy(WORD_EMBEDDINGS[tokens_m[i]])
+            else:
+                embedding_m = OWN_EMBEDDINGS[VOCABULARY[tokens_m[i]]]
+        new_sentence_1.append(torch.tensor(embedding_m))
+
+    line.append(new_sentence_1)
+
+    new_sentence_2 = []
+    for i in range(0,len(tokens_n)):
+        if MODE == "GENSIM_SKIP_GRAM":
+            embedding_n = WORD_EMBEDDINGS.wv[tokens_n[i]]
+        elif MODE == "OWN_EMBEDDINGS":
+            embedding_n = OWN_EMBEDDINGS[VOCABULARY[tokens_n[i]]]
+        elif MODE == "GOOGLE_NEWS":
+            if tokens_n[i] in WORD_EMBEDDINGS:
+                embedding_n = torch.from_numpy(WORD_EMBEDDINGS[tokens_n[i]])
+            else:
+                embedding_n = OWN_EMBEDDINGS[VOCABULARY[tokens_n[i]]]
+        new_sentence_2.append(torch.tensor(embedding_n))
+
+    line.append(new_sentence_2)
+    line.append(score)
+    return line
+
+"""
+Function to generate Sick Dataset (Training) augmented using Mixup and Random Deletion
+"""
+def generateMxRd():
+    lines = []
+
+    for i in tqdm.tqdm(range(0, int(NUM_TRAIN/2))):
+        random_indices = np.array([np.random.randint(0,int(NUM_TRAIN)), np.random.randint(0,int(NUM_TRAIN)), np.random.randint(0,int(NUM_TRAIN))])
+
+        lines.append(generateMixedupSentence(i,i))
+        lines.append(generateMixedupSentence(i,random_indices[0]))
+        lines.append(generateMixedupSentence(i,random_indices[1]))
+        lines.append(generateMixedupSentence(i,random_indices[2]))
+    
+    for i in tqdm.tqdm(range(int(NUM_TRAIN/2), int(NUM_TRAIN))):
+        lines.append(generateWordEmbeddedSentences(SENTENCES_1[i], SENTENCES_2[i], SIMILARITY_SCORES[i]))               
+
+        new_sentence = deleteRandomStopWord(SENTENCES_1[i])
+        lines.append(generateWordEmbeddedSentences(new_sentence, SENTENCES_2[i], SIMILARITY_SCORES[i]))
+
+        new_sentence = deleteRandomStopWord(SENTENCES_2[i])
+        lines.append(generateWordEmbeddedSentences(SENTENCES_1[i], new_sentence, SIMILARITY_SCORES[i]))  
+
+        new_sentence_1 = deleteRandomStopWord(SENTENCES_1[i])
+        new_sentence_2 = deleteRandomStopWord(SENTENCES_2[i])
+        lines.append(generateWordEmbeddedSentences(new_sentence_1, new_sentence_2, SIMILARITY_SCORES[i])) 
+
+    if MODE == "GENSIM_SKIP_GRAM":
+        mx_rd_file = open("Data/GS_MX_RD_file.pkl",'wb')
+    elif MODE == "OWN_EMBEDDINGS":
+        mx_rd_file = open("Data/OE_MX_RD_file.pkl",'wb')
+    elif MODE == "GOOGLE_NEWS":
+        mx_rd_file = open("Data/GN_MX_RD_file.pkl",'wb')
+    pickle.dump(lines,mx_rd_file)
+    mx_rd_file.close()
+
+    print("MX - RD Data Generated")
+
+"""
+Function to generate Sick Dataset (Training) augmented using Mixup and Random Insertion
+"""
+def generateMxRi():
+    lines = []
+
+    for i in tqdm.tqdm(range(0, int(NUM_TRAIN/2))):
+        random_indices = np.array([np.random.randint(0,int(NUM_TRAIN)), np.random.randint(0,int(NUM_TRAIN)), np.random.randint(0,int(NUM_TRAIN))])
+
+        lines.append(generateMixedupSentence(i,i))
+        lines.append(generateMixedupSentence(i,random_indices[0]))
+        lines.append(generateMixedupSentence(i,random_indices[1]))
+        lines.append(generateMixedupSentence(i,random_indices[2]))
+    
+    for i in tqdm.tqdm(range(int(NUM_TRAIN/2), int(NUM_TRAIN))):
+        lines.append(generateWordEmbeddedSentences(SENTENCES_1[i], SENTENCES_2[i], SIMILARITY_SCORES[i]))               
+
+        new_sentence = insertRandomStopWord(SENTENCES_1[i])
+        lines.append(generateWordEmbeddedSentences(new_sentence, SENTENCES_2[i], SIMILARITY_SCORES[i]))
+
+        new_sentence = insertRandomStopWord(SENTENCES_2[i])
+        lines.append(generateWordEmbeddedSentences(SENTENCES_1[i], new_sentence, SIMILARITY_SCORES[i]))  
+
+        new_sentence_1 = insertRandomStopWord(SENTENCES_1[i])
+        new_sentence_2 = insertRandomStopWord(SENTENCES_2[i])
+        lines.append(generateWordEmbeddedSentences(new_sentence_1, new_sentence_2, SIMILARITY_SCORES[i])) 
+
+    mx_ri_file = open("Data/GS_MX_RI_file.pkl",'wb')
+    pickle.dump(lines,mx_ri_file)
+    mx_ri_file.close()
+
+    print("MX - RI Data Generated")
+
+"""
+Function to generate Sick Dataset (Training) augmented using Mixup and Synonym Replacement
+"""
+def generateMxSr():
+    lines = []
+
+    for i in tqdm.tqdm(range(0, int(NUM_TRAIN/2))):
+        random_indices = np.array([np.random.randint(0,int(NUM_TRAIN)), np.random.randint(0,int(NUM_TRAIN)), np.random.randint(0,int(NUM_TRAIN))])
+
+        lines.append(generateMixedupSentence(i,i))
+        lines.append(generateMixedupSentence(i,random_indices[0]))
+        lines.append(generateMixedupSentence(i,random_indices[1]))
+        lines.append(generateMixedupSentence(i,random_indices[2]))
+    
+    for i in tqdm.tqdm(range(int(NUM_TRAIN/2), int(NUM_TRAIN))):
+        lines.append(generateWordEmbeddedSentences(SENTENCES_1[i], SENTENCES_2[i], SIMILARITY_SCORES[i]))               
+
+        new_sentence = generateSynonymReplacedSentence(SENTENCES_1[i])
+        lines.append(generateWordEmbeddedSentences(new_sentence, SENTENCES_2[i], SIMILARITY_SCORES[i]))
+
+        new_sentence = generateSynonymReplacedSentence(SENTENCES_2[i])
+        lines.append(generateWordEmbeddedSentences(SENTENCES_1[i], new_sentence, SIMILARITY_SCORES[i]))  
+
+        new_sentence_1 = generateSynonymReplacedSentence(SENTENCES_1[i])
+        new_sentence_2 = generateSynonymReplacedSentence(SENTENCES_2[i])
+        lines.append(generateWordEmbeddedSentences(new_sentence_1, new_sentence_2, SIMILARITY_SCORES[i])) 
+
+    mx_sr_file = open("Data/GS_MX_SR_file.pkl",'wb')
+    pickle.dump(lines,mx_sr_file)
+    mx_sr_file.close()
+
+    print("MX - SR Data Generated")
+
+"""
+Function to generate Sick Dataset (Training) augmented using Random Deletion and Random Insertion
+"""
+def generateRdRi():
+    file = open("Data/RD_RI.txt", "w")
+    for i in range(0,int(NUM_TRAIN/2)):
+        line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+
+        new_sentence = deleteRandomStopWord(SENTENCES_1[i])
+        line = new_sentence + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+
+        new_sentence = deleteRandomStopWord(SENTENCES_2[i])
+        line = SENTENCES_1[i] + "\t" + new_sentence + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+
+        new_sentence_1 = deleteRandomStopWord(SENTENCES_1[i])
+        new_sentence_2 = deleteRandomStopWord(SENTENCES_2[i])
+        line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+    
+    for i in range(int(NUM_TRAIN/2), int(NUM_TRAIN)):
+        line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+
+        new_sentence = insertRandomStopWord(SENTENCES_1[i])
+        line = new_sentence + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+
+        new_sentence = insertRandomStopWord(SENTENCES_2[i])
+        line = SENTENCES_1[i] + "\t" + new_sentence + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+
+        new_sentence_1 = insertRandomStopWord(SENTENCES_1[i])
+        new_sentence_2 = insertRandomStopWord(SENTENCES_2[i])
+        line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+    file.close()
+
+"""
+Function to generate Sick Dataset (Training) augmented using Random Deletion and Synonym Replacement
+"""
+def generateRdSr():
+    file = open("Data/RD_SR.txt", "w")
+    for i in range(0,int(NUM_TRAIN/2)):
+        line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+
+        new_sentence = deleteRandomStopWord(SENTENCES_1[i])
+        line = new_sentence + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+
+        new_sentence = deleteRandomStopWord(SENTENCES_2[i])
+        line = SENTENCES_1[i] + "\t" + new_sentence + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+
+        new_sentence_1 = deleteRandomStopWord(SENTENCES_1[i])
+        new_sentence_2 = deleteRandomStopWord(SENTENCES_2[i])
+        line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+    
+    for i in range(int(NUM_TRAIN/2), int(NUM_TRAIN)):
+        line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+
+        new_sentence_1 = generateSynonymReplacedSentence(SENTENCES_1[i])
+        new_sentence_2 = generateSynonymReplacedSentence(SENTENCES_2[i])
+        line = new_sentence_1 + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+
+        line = SENTENCES_1[i] + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+
+        new_sentence_1 = generateSynonymReplacedSentence(SENTENCES_1[i])
+        new_sentence_2 = generateSynonymReplacedSentence(SENTENCES_2[i])
+        line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+    file.close()
+
+"""
+Function to generate Sick Dataset (Training) augmented using Synonym Replacement and Random Insertion
+"""
+def generateSrRi():
+    file = open("Data/SR_RI.txt", "w")
+    for i in range(0,int(NUM_TRAIN/2)):
+        line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+
+        new_sentence_1 = generateSynonymReplacedSentence(SENTENCES_1[i])
+        new_sentence_2 = generateSynonymReplacedSentence(SENTENCES_2[i])
+        line = new_sentence_1 + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+
+        line = SENTENCES_1[i] + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+
+        new_sentence_1 = generateSynonymReplacedSentence(SENTENCES_1[i])
+        new_sentence_2 = generateSynonymReplacedSentence(SENTENCES_2[i])
+        line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+    
+    for i in range(int(NUM_TRAIN/2), int(NUM_TRAIN)):
+        line = SENTENCES_1[i] + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+
+        new_sentence = insertRandomStopWord(SENTENCES_1[i])
+        line = new_sentence + "\t" + SENTENCES_2[i] + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+
+        new_sentence = insertRandomStopWord(SENTENCES_2[i])
+        line = SENTENCES_1[i] + "\t" + new_sentence + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+
+        new_sentence_1 = insertRandomStopWord(SENTENCES_1[i])
+        new_sentence_2 = insertRandomStopWord(SENTENCES_2[i])
+        line = new_sentence_1 + "\t" + new_sentence_2 + "\t" + str(SIMILARITY_SCORES[i]) + "\n"
+        file.write(line.lower())
+    file.close()
 
 file = open("Data/SICK.txt", "r")
 lines = file.readlines()
@@ -437,13 +747,30 @@ NUM_SAMPLES = len(SENTENCES_1)
 NUM_TRAIN = 0.8*NUM_SAMPLES
 NUM_TEST = 0.2*NUM_SAMPLES
 
-WORD_EMBEDDINGS = Word2Vec.load("Models/word2vec.model")
+word_embeddings_file = open("Pickle/word_embeddings_file.pkl",'rb')
+OWN_EMBEDDINGS = pickle.load(word_embeddings_file)
+word_embeddings_file.close()
 
-generateBaseSickData()
-generateBaseSickTrainData()
-generateBaseSickTestData()
-generateRandomDeletionData()
-generateRandomInsertionData()
+vocabulary_file = open("Pickle/vocabulary_file.pkl",'rb')
+VOCABULARY = pickle.load(vocabulary_file)
+vocabulary_file.close()
+
+if MODE == "GENSIM_SKIP_GRAM":
+    WORD_EMBEDDINGS = Word2Vec.load("Models/gensim_skipgram.model")
+elif MODE == "GOOGLE_NEWS":
+    WORD_EMBEDDINGS = KeyedVectors.load_word2vec_format('Models/GoogleNews-vectors-negative300.bin', binary = True)
+
+# generateBaseSickData()
+# generateBaseSickTrainData()
+# generateBaseSickTestData()
+# generateRandomDeletionData()
+# generateRandomInsertionData()
 # generateBackTranslationData()
-generateSynonymReplacementData()
-generateMixupData()
+# generateSynonymReplacementData()
+# generateMixupData()
+# generateMxRd()
+# generateMxRi()
+# generateMxSr()
+# generateRdRi()
+# generateRdSr()
+# generateSrRi()
