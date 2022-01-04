@@ -4,9 +4,14 @@ import torch.nn as nn
 import math
 import pickle
 import re
+from gensim.models import Word2Vec
+from gensim.models import KeyedVectors
+import gensim
+from scipy import spatial
+import numpy as np
 
-#Re-implement this function here 
-LONGEST_LENGTH = 32
+#Re-implement in a cell later 
+LONGEST_LENGTH = 0
 
 #Depth of LSTM network
 num_layers = 1
@@ -17,17 +22,46 @@ H_in = 300
 #Dimension of hidden & cell states
 H_hidden = 50
 
-#Reading word embeddings
+#Model Variant (OWN_EMBEDDINGS, GOOGLE_NEWS, GENSIM_SKIP_GRAM)
+MODE = "OWN_EMBEDDINGS"
 
-word_embeddings_file = open("Pickle/word_embeddings.pkl",'rb')
+# #Reading word embeddings
+
+word_embeddings_file = open("Pickle/word_embeddings_file.pkl",'rb')
 WORD_EMBEDDINGS = pickle.load(word_embeddings_file)
 word_embeddings_file.close()
+
+#word2vec_model_google = KeyedVectors.load_word2vec_format('Models/GoogleNews-vectors-negative300.bin', binary = True)
 
 #Reading vocabulary
 
 vocabulary_file = open("Pickle/vocabulary_file.pkl",'rb')
 VOCABULARY = pickle.load(vocabulary_file)
 vocabulary_file.close()
+
+#Loading custom word2vec model trained using gensim on SICK
+#word2vec_model = Word2Vec.load("Models/gensim_skipgram.model")
+
+word1 = "sea"
+word2 = "fish"
+
+vec1 = WORD_EMBEDDINGS[VOCABULARY[word1]]
+vec2 = WORD_EMBEDDINGS[VOCABULARY[word2]]
+
+print("OWN EMBEDDINGS - {}".format(1 - spatial.distance.cosine(vec1, vec2)))
+
+#print(np.dot(vec1,vec2)/(np.linalg.norm(vec1)*np.linalg.norm(vec2)))
+
+
+vec1 = word2vec_model_google[word1]
+vec2 = word2vec_model_google[word2]
+
+print("Google News Dataset - {}".format(1 - spatial.distance.cosine(vec1, vec2)))
+
+vec1 = word2vec_model.wv[word1]
+vec2 = word2vec_model.wv[word2]
+
+print("Gensim Skip Gram - {}".format(1 - spatial.distance.cosine(vec1, vec2)))
 
 """
 Function to generate tokens
@@ -94,13 +128,79 @@ model = Siamese(H_in, H_hidden)
 
 #Loading saved model
 
-model.load_state_dict(torch.load("model.pt"))
+model.load_state_dict(torch.load("Models/OE_RD_TEST.pt"))
 
-sent1 = "A parrot is speaking"
+#Reading Test Set here for inference
 
-sent2 = "The parrot is silent in front of the microphone"
+f = open("Data/data_sick_test.txt", 'r')
 
-#Retrieving word vectors
+#Variable to compute length of longest sequence
+
+leng_long = 0
+
+lines = f.readlines()
+
+test_dataset_size = len(lines) #Should be 1968 ideally
+
+s1_embeddings = []
+
+s2_embeddings = []
+
+labels = []
+
+for line in lines:
+
+  line = line.split("\t")
+
+  sent1 = line[0]
+
+  sent2 = line[1]
+
+  labels.append(float(line[2]))
+
+  sent1_embedding = []
+
+  sent2_embedding = []
+
+  for word in generateTokens(sent1):
+    if MODE == "GOOGLE_NEWS":
+      if word in word2vec_model:
+          sent1_embedding.append(torch.from_numpy(word2vec_model[word]))
+      else:
+          sent1_embedding.append(WORD_EMBEDDINGS[VOCABULARY[word]])
+    elif MODE == "GENSIM_SKIP_GRAM":
+      sent1_embedding.append(torch.from_numpy(word2vec_model.wv[word]))
+    elif MODE == "OWN_EMBEDDINGS":
+      sent1_embedding.append(WORD_EMBEDDINGS[VOCABULARY[word]])
+
+  leng_long = len(generateTokens(sent1)) if len(generateTokens(sent1)) > leng_long else leng_long
+
+  for word in generateTokens(sent2):
+    if MODE == "GOOGLE_NEWS":
+      if word in word2vec_model:
+            sent2_embedding.append(torch.from_numpy(word2vec_model[word]))
+      else:
+            sent2_embedding.append(WORD_EMBEDDINGS[VOCABULARY[word]])
+    elif MODE == "GENSIM_SKIP_GRAM":
+      sent2_embedding.append(torch.from_numpy(word2vec_model.wv[word]))
+    elif MODE == "OWN_EMBEDDINGS":
+      sent2_embedding.append(WORD_EMBEDDINGS[VOCABULARY[word]])
+
+  leng_long = len(generateTokens(sent2)) if len(generateTokens(sent2)) > leng_long else leng_long
+
+  s1_embeddings.append(sent1_embedding)
+
+  s2_embeddings.append(sent2_embedding)
+
+LONGEST_LENGTH = leng_long
+
+labels = torch.FloatTensor(labels)
+
+sent1 = "a cluster of four brown dogs are playing in a field of brown grass."
+
+sent2 = "four dogs are playing in a area covered by grass."
+
+#Retrieving word vectors from Gensim's pre-trained model on Google News Dataset
 
 sent1_embedding = []
 
@@ -112,8 +212,6 @@ for word in generateTokens(sent1):
 for word in generateTokens(sent2):
     sent2_embedding.append(WORD_EMBEDDINGS[VOCABULARY[word]])
 
-#Padding with zeros to match length of longest sequence
-
 if len(sent1_embedding) < LONGEST_LENGTH:
     for _ in range(LONGEST_LENGTH - len(sent1_embedding)):
         sent1_embedding.append(torch.zeros(300))
@@ -121,6 +219,27 @@ if len(sent1_embedding) < LONGEST_LENGTH:
 if len(sent2_embedding) < LONGEST_LENGTH:
     for _ in range(LONGEST_LENGTH - len(sent2_embedding)):
         sent2_embedding.append(torch.zeros(300))
+
+#Padding with zeros to match length of longest sequence
+
+for idx in range(test_dataset_size):
+  if len(s1_embeddings[idx]) < LONGEST_LENGTH:
+      for _ in range(LONGEST_LENGTH - len(s1_embeddings[idx])):
+          s1_embeddings[idx].append(torch.zeros(300))
+
+  if len(s2_embeddings[idx]) < LONGEST_LENGTH:
+      for _ in range(LONGEST_LENGTH - len(s2_embeddings[idx])):
+          s2_embeddings[idx].append(torch.zeros(300))
+
+for idx in range(test_dataset_size):
+  s1_embeddings[idx] = torch.stack(s1_embeddings[idx])
+  s2_embeddings[idx] = torch.stack(s2_embeddings[idx])
+
+s1_embeddings = torch.stack(s1_embeddings)
+
+s2_embeddings = torch.stack(s2_embeddings)
+
+print(s1_embeddings.shape, s2_embeddings.shape)
 
 #Reshaping to (batch_size, sequence_length, h_in) format to input to Siamese n/w 
 
@@ -130,8 +249,15 @@ sent2_embedding = torch.stack(sent2_embedding).reshape(1,LONGEST_LENGTH, H_in)
 
 #Scores outputted
 
-scores = model(sent1_embedding, sent2_embedding)
+scores = model.forward(sent1_embedding, sent2_embedding)
 
 #Rescaling scores back to [0,5]
+scores = scores * 5
 
-print(scores.item()*5)
+print(scores)
+
+#Measuring Test Error
+
+criterion = nn.MSELoss()
+
+print("Test Error is {}".format(criterion(scores, labels)))

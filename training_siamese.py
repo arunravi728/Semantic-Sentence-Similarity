@@ -12,18 +12,27 @@ import random
 import math
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+from gensim.models import KeyedVectors
+import gensim
+from gensim.models import Word2Vec
 
 #Reading word embeddings
-
-word_embeddings_file = open("Pickle/word_embeddings.pkl",'rb')
+word_embeddings_file = open("Data/word_embeddings_file.pkl",'rb')
 WORD_EMBEDDINGS = pickle.load(word_embeddings_file)
 word_embeddings_file.close()
 
 #Reading vocabulary
-
 vocabulary_file = open("Pickle/vocabulary_file.pkl",'rb')
 VOCABULARY = pickle.load(vocabulary_file)
 vocabulary_file.close()
+
+#Google News Dataset
+# google_news_model = KeyedVectors.load_word2vec_format('Models/GoogleNews-vectors-negative300.bin', binary = True)
+
+# print(len(list(google_news_model.keys())))
+
+#Loading custom word2vec model trained using gensim on SICK
+# word2vec_model = Word2Vec.load("Models/gensim_skipgram.model")
 
 #Dimension of Input Word Vectors
 H_in = 300
@@ -38,36 +47,21 @@ batch_size = 64
 alpha = 0.001
 
 #Number of epochs
-num_epochs = 50
+num_epochs = 25
 
 #Number of layers (Stacked vs Non stacked)
 num_layers = 1
 
-"""
-We have 9840 training instances in our training set
-"""
+#Training Set Size (Value is set in a cell later)
+training = 0
 
-#Training Set Size
-training = 8000
-
-#Test Set Size
-test = 1840
-
-#Dataset Size
-dataset = 9840
-
-"""
-Function to generate token
-"""
+#Model Variant (OWN_EMBEDDINGS, GOOGLE_NEWS, GENSIM_SKIP_GRAM)
+MODE = "OWN_EMBEDDINGS"
 
 def generateTokens(text):
     pattern = re.compile(r'[A-Za-z]+[\w^\']*|[\w^\']*[A-Za-z]+[\w^\']*')
     return pattern.findall(text.lower())
 
-
-"""
-Input will be (Batch_Size, Sequence Length, Input Dimension)
-"""
 
 class Siamese(nn.Module):
     def __init__(self, input_dim, hidden_dim):
@@ -120,17 +114,18 @@ class Siamese(nn.Module):
 
         return self.similarity_scores
 
-        
 
 """
 Data Pre-processing
 """
 
-file = open("SICK.txt", 'r')
+file = open("Data/data_random_deletion.txt", 'r')
 
 sentences = []
 
 lines = file.readlines()
+
+training = len(lines)
 
 """
 Preparing Training Set for the training loop
@@ -138,13 +133,13 @@ Preparing Training Set for the training loop
 #variable to compute length of longest sentence to fix sequence leng
 leng_long = 0
 
-for line in lines[1:]:
+for line in lines:
 
     #splitting by tab space
     line = line.split('\t')
 
     #tokenizing sentence 1
-    sent1_tokenized = generateTokens(line[1])
+    sent1_tokenized = generateTokens(line[0])
 
     #Finding the longest sentence
     leng_long = len(sent1_tokenized) if len(sent1_tokenized) > leng_long else leng_long
@@ -153,10 +148,18 @@ for line in lines[1:]:
     sent1_embedding = []
 
     for word in sent1_tokenized:
-        sent1_embedding.append(WORD_EMBEDDINGS[VOCABULARY[word]])  
+        if MODE == "OWN_EMBEDDINGS":
+          sent1_embedding.append(WORD_EMBEDDINGS[VOCABULARY[word]])  
+        elif MODE == "GOOGLE_NEWS":
+          if word in google_news_model:
+            sent1_embedding.append(torch.from_numpy(google_news_model[word]))
+          else:
+            sent1_embedding.append(WORD_EMBEDDINGS[VOCABULARY[word]])
+        elif MODE == "GENSIM_SKIP_GRAM":
+            sent1_embedding.append(torch.from_numpy(word2vec_model.wv[word]))
 
     #tokenizing sentence 2
-    sent2_tokenized = generateTokens(line[2])
+    sent2_tokenized = generateTokens(line[1])
 
     #Finding the longest sentence
     leng_long = len(sent2_tokenized) if len(sent2_tokenized) > leng_long else leng_long
@@ -165,20 +168,25 @@ for line in lines[1:]:
     sent2_embedding = []
 
     for word in sent2_tokenized:
-        sent2_embedding.append(WORD_EMBEDDINGS[VOCABULARY[word]]) 
+        if MODE == "OWN_EMBEDDINGS":
+          sent2_embedding.append(WORD_EMBEDDINGS[VOCABULARY[word]])  
+        elif MODE == "GOOGLE_NEWS":
+          if word in google_news_model:
+            sent2_embedding.append(torch.from_numpy(google_news_model[word]))
+          else:
+            sent2_embedding.append(WORD_EMBEDDINGS[VOCABULARY[word]])
+        elif MODE == "GENSIM_SKIP_GRAM":
+            sent2_embedding.append(torch.from_numpy(word2vec_model.wv[word])) 
 
     #storing the sentence embeddings in Training Set
-    sentences.append((sent1_embedding, sent2_embedding, torch.tensor(float(line[4]))))
+    sentences.append((sent1_embedding, sent2_embedding, torch.tensor(float(line[2]))))
 
 LONGEST_LENGTH = leng_long
-
-
-#At this point, remember all word embeddings and labels are converted into Tensors!
 
 """
 Pad with zeros so all sequence lengths are equal to LONGEST_LENGTH
 """
-for idx in range(dataset):
+for idx in range(training):
     if len(sentences[idx][0]) < LONGEST_LENGTH:
         for _ in range(LONGEST_LENGTH - len(sentences[idx][0])):
             sentences[idx][0].append(torch.zeros(H_in))
@@ -186,17 +194,16 @@ for idx in range(dataset):
         for _ in range(LONGEST_LENGTH - len(sentences[idx][1])):
             sentences[idx][1].append(torch.zeros(H_in))
 
+
 """
-Shuffling and Splitting data into test and training data
+Shuffling training data
 """
 
-lst_indices = list(range(dataset))
+lst_indices = list(range(training))
 
 random.shuffle(lst_indices)
 
-train_data = [sentences[idx] for idx in lst_indices[:training]]
-
-test_data = [sentences[idx] for idx in lst_indices[training:]]
+train_data = [sentences[idx] for idx in lst_indices]
 
 """
 Loading data into batches for the training loop
@@ -233,6 +240,10 @@ optimizer = optim.Adam(model.parameters(), lr = alpha)
 losses = []
 
 print("All Pre-processing Done. Onto Training!!!")
+
+"""
+Training Loop
+"""
 
 for epoch in range(num_epochs):
     n_batches = 0
@@ -276,13 +287,17 @@ for epoch in range(num_epochs):
 
     losses.append(running_loss/n_batches)
 
-#Making a plot of epochs vs losses
+#Making a plot of epochs vs losses (Needs to be changed)
 x = np.arange(1, num_epochs + 1)
 
 plt.plot(x, losses)
 
+#plt.savefig("Plots/OE_RD_TEST.png", dpi = 300, facecolor = 'w')
+
 plt.show()
 
-#Saving trained Model
-torch.save(model.state_dict(), "model.pt")
+print("Final Training Error is {}".format(losses[-1]))
+
+#Saving trained Model (Needs to be changed)
+torch.save(model.state_dict(), "Models/OE_RD_TEST.pt")
 print("Model Saved Successfully")
